@@ -1,2 +1,2 @@
 # stabler
-Packrat playground with stable version-needing stuffs
+Playground for stable-version-needing stuffs using packrat.
