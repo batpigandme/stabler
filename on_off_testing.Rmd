@@ -185,7 +185,17 @@ head(home_v_min$players, n = 5)
 home_v_min$GiannisAntetokounmpo <- ifelse(grepl("203507", home_v_min$players), 1, 0)
 ```
 
+```{r}
+player_on_off <- function(df, pid, pname){
+  pof <- ifelse(grepl(pid, df$players), 1, 0)
+  pof_df <- data_frame(pof)
+  new_df <- bind_cols(df, pof_df)
+  new_df <- rename(new_df, pname = pof)
+}
+```
+
 However, we'll need an equivalent variable for all of the players.
+
 ```{r named list}
 ## name pid_vec
 named_pids <- pid_vec
@@ -194,6 +204,14 @@ names(named_pids) <- pname_vec
 
 named_pids
 ```
+
+
+
+```{r}
+names(named_pids)
+```
+
+
 ----
 ```{r sessionInfo}
 sessionInfo()
