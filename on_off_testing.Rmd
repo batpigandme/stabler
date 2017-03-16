@@ -106,6 +106,12 @@ away_pbp <- pbp_1617 %>%
 
 ```
 
+Now we have a data frame with a few more variables.
+```{r glimpse}
+glimpse(home_pbp)
+```
+
+
 ## Gathering Observations
 
 One way to approach this, would be to gather the data such that you have an observation for each of the players on the court for a given event.
@@ -167,7 +173,12 @@ home_v_min <- home_pbp %>%
 
 ## Adding logical player columns
 
-Now we want to determine whether or not a player was on the court for each of the observations. For example, we might create a variable for Giannis Antetokounmpo that looks and sees if his corresponding player ID number is in the `players` column we created earlier.
+Now we want to determine whether or not a player was on the court for each of the observations. For example, we might create a variable for Giannis Antetokounmpo that looks and sees if his corresponding player ID number is in the `players` column we created earlier (which, in case you forgot, you can see five rows of, below).
+
+```{r glimpse players}
+head(home_v_min$players, n = 5)
+```
+
 
 ```{r giannis}
 ## testing ways to build on/off matrix
