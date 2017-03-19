@@ -2,6 +2,33 @@
 player_check <- function(df, pid, pname){
   mutate(df, pname = if_else(grepl(pid, players), 1, 0))
 }
+df = "home_v_min"
+
+pid = "203521"
+
+pname = "MatthewDellavedova"
+
+pname <- "MatthewDellavedova"
+
+pasted <- paste(df,", ",pname," = if_else(grepl(",pid,", players), 1, 0)", sep = "")
+
+as.name(pasted)
+
+playfun <- function(df, pname, pid){
+paste(df,", ",pname," = if_else(grepl(",pid,", players), 1, 0)", sep = "")
+}
+
+f2 <- function(df, pname, pid){
+  step1 <- paste(df,", ",pname," = if_else(grepl(",pid,", players), 1, 0)", sep = "")
+  eval(step1)
+}
+
+f2("home_v_min", "MatthewDellavedova", "203521")
+
+
+thing <- playfun("home_v_min", "MatthewDellavedova", "203521")
+
+thing <- paste(pname," = if_else(grepl(",pid,", players), 1, 0)", sep = "")
 
 
 test <- home_v_min
@@ -14,6 +41,9 @@ named_pids[['JabariParker']]
 
 paste(colnames(test[50:67]))
 
+df %>%
+  thing <- paste(df,", ",pname," = if_else(grepl(",pid,", players), 1, 0)", sep = "")
+  mutate() %>%
 
 test <- player_check(home_v_min, "203953", "JabariParker")
 
@@ -52,3 +82,45 @@ starters_Q1<-starters_Q1[,1]
 
 starters_Q1<-subset(starters_Q1,starters_Q1[,3]!="0:00")
 
+
+
+## WTF with paste and parse
+playfun <- function(df, pname, pid){
+  step1 <- paste("mutate(",df,", ",pname," = if_else(grepl(",pid,", players), 1, 0))", sep = "")
+  ## no parse will try to read in file
+  parse(step1)}
+
+thing <- playfun("home_v_min", "MatthewDellavedova", "203521")
+
+## messing around with lazyeval and dots
+## NSE w dplyr
+## source: http://rmhogervorst.nl/cleancode/blog/2016/06/13/NSE_standard_evaluation_dplyr.html
+f <- function(col1, col2, new_col_name) {
+  mutate_call <- lazyeval::interp(~ a + b, a = as.name(col1), b = as.name(col2))
+  mtcars %>% mutate_(.dots = setNames(list(mutate_call), new_col_name))
+}
+
+pfun <- function(df, pid, pname) {
+  pasted <- paste(df,", ",pname," = if_else(grepl(pid, players), 1, 0)", sep = "")
+  call <- as.name(pasted)
+  mutate_call <- lazyeval::interp(call)
+  mutate_(.dots = setNames(list(mutate_call), pid))
+}
+
+pfun(df = df, pid = pid, pname = pname)
+
+## ******* WORKING ******** ##
+pfunner <- function(df, pid, pname) {
+  mutate_call <- lazyeval::interp(~ if_else(grepl(a, players), 1, 0), a = deparse(as.name(pid)))
+  df %>% mutate_(.dots = setNames(list(mutate_call), pname))
+}
+
+pfunner(df = df, pid = pid, pname = pname)
+
+test2 <- pfunner(home_v_min, "203521", "MatthewDellavedova")
+
+pid <- "203503"
+
+pname <- "TonySnell"
+
+test3 <- pfunner(home_v_min, pid = pid, pname = pname)
