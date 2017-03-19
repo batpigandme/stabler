@@ -251,11 +251,39 @@ head(home_v_min$players, n = 5)
 ```r
 ## testing ways to build on/off matrix
 home_v_min$GiannisAntetokounmpo <- ifelse(grepl("203507", home_v_min$players), 1, 0)
+
+home_v_min2 <- home_v_min
+
+home_v_min2$MatthewDellavedova <- if_else(grepl("203521", home_v_min2$players), 1, 0)
+
+home_v_min2 <- home_v_min %>%
+  mutate(MatthewDellavedova = if_else(grepl("203521", players), 1, 0))
+```
+
+
+```r
+## nope uses "pname" as actual colname
+player_on_off <- function(df, pid, pname){
+  pof <- ifelse(grepl(pid, df$players), 1, 0)
+  pof_df <- data_frame(pof)
+  new_df <- bind_cols(df, pof_df)
+  new_df <- rename(new_df, pname = pof)
+}
+
+## this pne actually works
+pfunner <- function(df, pid, pname) {
+  mutate_call <- lazyeval::interp(~ if_else(grepl(a, players), 1, 0), a = deparse(as.name(pid)))
+  df %>% mutate_(.dots = setNames(list(mutate_call), pname))
+}
 ```
 
 However, we'll need an equivalent variable for all of the players.
 
+
 ```r
+## pid list
+pid_list <- as.list(pids_1617$pid)
+
 ## name pid_vec
 named_pids <- pid_vec
 
@@ -278,6 +306,28 @@ named_pids
 ##         JabariParker         MilesPlumlee           SteveNovak 
 ##               203953               203101               200779
 ```
+
+
+
+
+```r
+names(named_pids)
+```
+
+```
+##  [1] "GiannisAntetokounmpo" "MalcolmBrogdon"       "MatthewDellavedova"  
+##  [4] "TonySnell"            "GregMonroe"           "JohnHenson"          
+##  [7] "MirzaTeletovic"       "JasonTerry"           "KhrisMiddleton"      
+## [10] "ThonMaker"            "RashadVaughn"         "SpencerHawes"        
+## [13] "TerrenceJones"        "AxelToupane"          "MichaelBeasley"      
+## [16] "JabariParker"         "MilesPlumlee"         "SteveNovak"
+```
+
+```r
+name_tibble <- enframe(named_pids, name = "pname", value = "pid")
+```
+
+
 ----
 
 ```r

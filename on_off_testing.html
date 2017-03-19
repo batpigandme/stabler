@@ -11,7 +11,7 @@
 
 <meta name="author" content="Mara Averick" />
 
-<meta name="date" content="2017-03-16" />
+<meta name="date" content="2017-03-19" />
 
 <title>On/Off Testing</title>
 
@@ -119,7 +119,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">On/Off Testing</h1>
 <h4 class="author"><em>Mara Averick</em></h4>
-<h4 class="date"><em>2017-03-16</em></h4>
+<h4 class="date"><em>2017-03-19</em></h4>
 
 </div>
 
@@ -307,9 +307,32 @@ home_v_min &lt;- home_pbp %&gt;%
 ## [4] &quot;203114, 203503, 202328, 203507, 203521&quot;
 ## [5] &quot;203114, 203503, 202328, 203507, 203521&quot;</code></pre>
 <pre class="r"><code>## testing ways to build on/off matrix
-home_v_min$GiannisAntetokounmpo &lt;- ifelse(grepl(&quot;203507&quot;, home_v_min$players), 1, 0)</code></pre>
+home_v_min$GiannisAntetokounmpo &lt;- ifelse(grepl(&quot;203507&quot;, home_v_min$players), 1, 0)
+
+home_v_min2 &lt;- home_v_min
+
+home_v_min2$MatthewDellavedova &lt;- if_else(grepl(&quot;203521&quot;, home_v_min2$players), 1, 0)
+
+home_v_min2 &lt;- home_v_min %&gt;%
+  mutate(MatthewDellavedova = if_else(grepl(&quot;203521&quot;, players), 1, 0))</code></pre>
+<pre class="r"><code>## nope uses &quot;pname&quot; as actual colname
+player_on_off &lt;- function(df, pid, pname){
+  pof &lt;- ifelse(grepl(pid, df$players), 1, 0)
+  pof_df &lt;- data_frame(pof)
+  new_df &lt;- bind_cols(df, pof_df)
+  new_df &lt;- rename(new_df, pname = pof)
+}
+
+## this pne actually works
+pfunner &lt;- function(df, pid, pname) {
+  mutate_call &lt;- lazyeval::interp(~ if_else(grepl(a, players), 1, 0), a = deparse(as.name(pid)))
+  df %&gt;% mutate_(.dots = setNames(list(mutate_call), pname))
+}</code></pre>
 <p>However, we’ll need an equivalent variable for all of the players.</p>
-<pre class="r"><code>## name pid_vec
+<pre class="r"><code>## pid list
+pid_list &lt;- as.list(pids_1617$pid)
+
+## name pid_vec
 named_pids &lt;- pid_vec
 
 names(named_pids) &lt;- pname_vec
@@ -327,6 +350,14 @@ named_pids</code></pre>
 ##               203093              1626253               201563 
 ##         JabariParker         MilesPlumlee           SteveNovak 
 ##               203953               203101               200779</code></pre>
+<pre class="r"><code>names(named_pids)</code></pre>
+<pre><code>##  [1] &quot;GiannisAntetokounmpo&quot; &quot;MalcolmBrogdon&quot;       &quot;MatthewDellavedova&quot;  
+##  [4] &quot;TonySnell&quot;            &quot;GregMonroe&quot;           &quot;JohnHenson&quot;          
+##  [7] &quot;MirzaTeletovic&quot;       &quot;JasonTerry&quot;           &quot;KhrisMiddleton&quot;      
+## [10] &quot;ThonMaker&quot;            &quot;RashadVaughn&quot;         &quot;SpencerHawes&quot;        
+## [13] &quot;TerrenceJones&quot;        &quot;AxelToupane&quot;          &quot;MichaelBeasley&quot;      
+## [16] &quot;JabariParker&quot;         &quot;MilesPlumlee&quot;         &quot;SteveNovak&quot;</code></pre>
+<pre class="r"><code>name_tibble &lt;- enframe(named_pids, name = &quot;pname&quot;, value = &quot;pid&quot;)</code></pre>
 <hr />
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 3.3.3 (2017-03-06)
