@@ -214,11 +214,14 @@ However, we'll need an equivalent variable for all of the players.
 ## pid list
 pid_list <- as.list(pids_1617$pid)
 
+pname_list <- as.list(pids_1617$pname)
+
 ## name pid_vec
 named_pids <- pid_vec
 
 names(named_pids) <- pname_vec
 
+names(named_pids[1])
 named_pids
 ```
 
@@ -230,6 +233,28 @@ names(named_pids)
 name_tibble <- enframe(named_pids, name = "pname", value = "pid")
 ```
 
+```{r}
+## df_list <- as.list(rep(home_v_min), each=18)
+
+## args2 <- list(pid = pid_list, pname = pname_list)
+
+## works, using named list of player ids 
+## manually passing the name of the game data frame
+output <- for (i in 1:length(named_pids)) {
+  test4 <- pfunner(home_v_min, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_v_min <- test4
+}
+
+test3 <- pfunner(home_v_min, pname = names(named_pids[2]), pid = named_pids[[2]])
+```
+
+```{r}
+home_test <- home_pbp
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(home_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_test <- test4
+}
+```
 
 ----
 ```{r sessionInfo}

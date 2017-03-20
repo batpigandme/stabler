@@ -11,7 +11,7 @@
 
 <meta name="author" content="Mara Averick" />
 
-<meta name="date" content="2017-03-19" />
+<meta name="date" content="2017-03-20" />
 
 <title>On/Off Testing</title>
 
@@ -119,7 +119,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">On/Off Testing</h1>
 <h4 class="author"><em>Mara Averick</em></h4>
-<h4 class="date"><em>2017-03-19</em></h4>
+<h4 class="date"><em>2017-03-20</em></h4>
 
 </div>
 
@@ -332,12 +332,16 @@ pfunner &lt;- function(df, pid, pname) {
 <pre class="r"><code>## pid list
 pid_list &lt;- as.list(pids_1617$pid)
 
+pname_list &lt;- as.list(pids_1617$pname)
+
 ## name pid_vec
 named_pids &lt;- pid_vec
 
 names(named_pids) &lt;- pname_vec
 
-named_pids</code></pre>
+names(named_pids[1])</code></pre>
+<pre><code>## [1] &quot;GiannisAntetokounmpo&quot;</code></pre>
+<pre class="r"><code>named_pids</code></pre>
 <pre><code>## GiannisAntetokounmpo       MalcolmBrogdon   MatthewDellavedova 
 ##               203507              1627763               203521 
 ##            TonySnell           GregMonroe           JohnHenson 
@@ -358,6 +362,23 @@ named_pids</code></pre>
 ## [13] &quot;TerrenceJones&quot;        &quot;AxelToupane&quot;          &quot;MichaelBeasley&quot;      
 ## [16] &quot;JabariParker&quot;         &quot;MilesPlumlee&quot;         &quot;SteveNovak&quot;</code></pre>
 <pre class="r"><code>name_tibble &lt;- enframe(named_pids, name = &quot;pname&quot;, value = &quot;pid&quot;)</code></pre>
+<pre class="r"><code>## df_list &lt;- as.list(rep(home_v_min), each=18)
+
+## args2 &lt;- list(pid = pid_list, pname = pname_list)
+
+## works, using named list of player ids 
+## manually passing the name of the game data frame
+output &lt;- for (i in 1:length(named_pids)) {
+  test4 &lt;- pfunner(home_v_min, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_v_min &lt;- test4
+}
+
+test3 &lt;- pfunner(home_v_min, pname = names(named_pids[2]), pid = named_pids[[2]])</code></pre>
+<pre class="r"><code>home_test &lt;- home_pbp
+for (i in 1:length(named_pids)) {
+  test4 &lt;- pfunner(home_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_test &lt;- test4
+}</code></pre>
 <hr />
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 3.3.3 (2017-03-06)
