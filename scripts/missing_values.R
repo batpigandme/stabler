@@ -25,3 +25,38 @@ end_var <- rev_within_rank %>%
 ## get rid of starts before ends
 pos_time <- end_var %>%
   filter(end_sec >= start_sec)
+
+away_time <- pos_time
+  for (i in 1:length(named_pids)) {
+  test4 <- pfunner(away_time, pname = names(named_pids[i]), pid = named_pids[[i]])
+  away_time <- test4
+}
+
+away_time <- away_time %>%
+  group_by(GAME_ID) %>%
+  arrange(GAME_ID, start_sec)
+
+seconds <- c(1:2880)
+df <- data.frame(seconds)
+
+test5 <- data.frame(seconds, x = "x")
+
+for (i in 1:length(away_gid)) {
+  test4 <- mutate(ifelse(df, seconds <= 2881, paste(seconds), FALSE))
+  df <- bind_cols(df, test4)}
+
+thing2 <- c(paste("g",away_gid, sep = ""))
+library(tidyverse)
+named_away <- away_gid
+names(named_away) <- thing2
+game_time <- enframe(named_away, name = "thing2", value = "away_gid")
+
+repeated_secs <- rep(c(1:2880), each=31)
+repeated_sec2 <- data.frame(repeated_secs)
+agid_list <- as.list(away_gid)
+away_gids <- rep(c(agid_list), times=2880)
+away_gids <- data_frame(away_gids)
+gid_secs <- bind_cols(repeated_sec2, away_gids)
+
+## now do mutating join (maybe merge?) with away_test
+## then fill in values
