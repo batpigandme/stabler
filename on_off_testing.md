@@ -360,6 +360,12 @@ for (i in 1:length(named_pids)) {
   test4 <- pfunner(home_test, pname = names(named_pids[i]), pid = named_pids[[i]])
   home_test <- test4
 }
+
+away_test <- away_pbp
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(away_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  away_test <- test4
+}
 ```
 
 ----

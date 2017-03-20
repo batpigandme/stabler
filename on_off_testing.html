@@ -378,6 +378,12 @@ test3 &lt;- pfunner(home_v_min, pname = names(named_pids[2]), pid = named_pids[[
 for (i in 1:length(named_pids)) {
   test4 &lt;- pfunner(home_test, pname = names(named_pids[i]), pid = named_pids[[i]])
   home_test &lt;- test4
+}
+
+away_test &lt;- away_pbp
+for (i in 1:length(named_pids)) {
+  test4 &lt;- pfunner(away_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  away_test &lt;- test4
 }</code></pre>
 <hr />
 <pre class="r"><code>sessionInfo()</code></pre>
