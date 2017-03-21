@@ -100,3 +100,14 @@ player_secs_sum <- player_seconds_df %>%
   summarise_all(funs(sum))
 
 write.csv(player_secs_sum, file="data/player_secs_sum.csv", row.names = FALSE)
+
+gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:19)
+
+library(forcats)
+
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = pname_vec)
+## check if factor
+class(gathered_player_secs$player)
+
+ggplot(gathered_player_secs, aes(x = start_sec, y = player), fill = freq)
+## need to add something here
