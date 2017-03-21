@@ -130,10 +130,13 @@ ggplot(gathered_player_secs,aes(x=second,y=player,fill=freq)) +
   geom_tile() +
   scale_fill_gradient(low = "grey90", high = "deeppink") +
   scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
   geom_vline(xintercept = 720, color = "white") +
   geom_vline(xintercept = 1440, color = "white") +
   geom_vline(xintercept = 2160, color = "white") +
-  theme(panel.grid = element_blank())
+  ggtitle("Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank())
 
 ## need to add something here
 class(gathered_player_secs$player)
