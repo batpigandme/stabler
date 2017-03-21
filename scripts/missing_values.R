@@ -91,3 +91,12 @@ write.csv(gid_sorted_pbp, file = "data/gid_sorted_pbp.csv", row.names = FALSE)
 
 colnames(gid_sorted_pbp[55:72])
 
+select_cols <- c("start_sec", pname_vec)
+player_seconds_df <- select(gid_sorted_pbp, one_of(c(select_cols)))
+
+## get sum of players 1, 0 for each second
+player_secs_sum <- player_seconds_df %>%
+  group_by(start_sec) %>%
+  summarise_all(funs(sum))
+
+write.csv(player_secs_sum, file="data/player_secs_sum.csv", row.names = FALSE)
