@@ -51,12 +51,23 @@ named_away <- away_gid
 names(named_away) <- thing2
 game_time <- enframe(named_away, name = "thing2", value = "away_gid")
 
-repeated_secs <- rep(c(1:2880), each=31)
+repeated_secs <- rep(c(0:2880), each=31)
 repeated_sec2 <- data.frame(repeated_secs)
 agid_list <- as.list(away_gid)
-away_gids <- rep(c(agid_list), times=2880)
+away_gids <- rep(c(agid_list), times=2881)
 away_gids <- data_frame(away_gids)
 gid_secs <- bind_cols(repeated_sec2, away_gids)
 
 ## now do mutating join (maybe merge?) with away_test
 ## then fill in values
+
+gid_secs2 <- gid_secs %>%
+  rename(start_sec = repeated_secs) %>%
+  rename(GAME_ID = away_gids) %>%
+  mutate(GAME_ID = as.character(GAME_ID))
+
+gid_secs_pbp <- left_join(gid_secs2, away_time, by = c("GAME_ID", "start_sec"))
+
+gid_sorted_pbp <- arrange(gid_secs_pbp, GAME_ID, start_sec)
+
+gid_sorted_pbp <- fill(gid_sorted_pbp, GiannisAntetokounmpo)
