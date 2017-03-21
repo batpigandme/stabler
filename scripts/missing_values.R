@@ -1,9 +1,9 @@
 ## get elapsed time for event number
-away_elpase <- away_pbp %>%
+away_elapse <- away_pbp %>%
   mutate(duration = tsecs_elapsed - lead(tsecs_elapsed))
 
 ## get only the non-negative values
-pos_duration <- away_elpase %>%
+pos_duration <- away_elapse %>%
   filter(duration > -1)
 
 ## within game rank
@@ -36,10 +36,8 @@ away_time <- away_time %>%
   group_by(GAME_ID) %>%
   arrange(GAME_ID, start_sec)
 
-seconds <- c(1:2880)
+seconds <- c(0:2880)
 df <- data.frame(seconds)
-
-test5 <- data.frame(seconds, x = "x")
 
 thing2 <- c(paste("g",away_gid, sep = ""))
 library(tidyverse)
@@ -47,7 +45,7 @@ named_away <- away_gid
 names(named_away) <- thing2
 game_time <- enframe(named_away, name = "thing2", value = "away_gid")
 
-repeated_secs <- rep(c(0:2880), each=31)
+repeated_secs <- rep(c(0:2880), each=length(away_gid))
 repeated_sec2 <- data.frame(repeated_secs)
 agid_list <- as.list(away_gid)
 away_gids <- rep(c(agid_list), times=2881)
@@ -64,10 +62,11 @@ gid_secs2 <- gid_secs %>%
 
 gid_secs_pbp <- left_join(gid_secs2, away_time, by = c("GAME_ID", "start_sec"))
 
-gid_sorted_pbp <- arrange(gid_secs_pbp, GAME_ID, start_sec)
+gid_sorted_pbp <- gid_secs_pbp %>%
+  arrange(GAME_ID, start_sec) %>%
+  rename(second = start_sec)
 
-gid_sorted_pbp[[55]]
-
+## get this into a loop
 gid_sorted_pbp <- fill(gid_sorted_pbp, GiannisAntetokounmpo)
 gid_sorted_pbp <- fill(gid_sorted_pbp, MalcolmBrogdon)
 gid_sorted_pbp <- fill(gid_sorted_pbp, MatthewDellavedova)
@@ -89,25 +88,54 @@ gid_sorted_pbp <- fill(gid_sorted_pbp, SteveNovak)
 
 write.csv(gid_sorted_pbp, file = "data/gid_sorted_pbp.csv", row.names = FALSE)
 
-colnames(gid_sorted_pbp[55:72])
+# colnames(gid_sorted_pbp[55:72])
 
-select_cols <- c("start_sec", pname_vec)
+select_cols <- c("second", pname_vec)
 player_seconds_df <- select(gid_sorted_pbp, one_of(c(select_cols)))
 
 ## get sum of players 1, 0 for each second
 player_secs_sum <- player_seconds_df %>%
-  group_by(start_sec) %>%
+  group_by(second) %>%
   summarise_all(funs(sum))
 
 write.csv(player_secs_sum, file="data/player_secs_sum.csv", row.names = FALSE)
 
 gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:19)
 
+total_player_secs <- player_secs_sum %>%
+  summarise_all(funs(sum)) %>%
+  rename(total = second) %>%
+  gather("player", "tot_secs", 1:19) %>%
+  filter(player != "total") %>%
+  arrange(desc(tot_secs))
+
 library(forcats)
 
-gathered_player_secs$player <- factor(gathered_player_secs$player, levels = pname_vec)
+## add total player secs to gathered
+gathered_player_secs$player_tot_secs <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_secs
+pids_1617$player_tot_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_secs
+
+ordered_pname <- pids_1617 %>%
+  arrange(player_tot_secs)
+
+ordered_pnames <- ordered_pname$pname
+
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = ordered_pnames)
 ## check if factor
 class(gathered_player_secs$player)
 
-ggplot(gathered_player_secs, aes(x = start_sec, y = player), fill = freq)
+
+## plotting frequency by second by player
+ggplot(gathered_player_secs,aes(x=second,y=player,fill=freq)) +
+  geom_tile() +
+  scale_fill_gradient(low = "grey90", high = "deeppink") +
+  scale_x_continuous(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white") +
+  geom_vline(xintercept = 1440, color = "white") +
+  geom_vline(xintercept = 2160, color = "white") +
+  theme(panel.grid = element_blank())
+
 ## need to add something here
+class(gathered_player_secs$player)
+class(gathered_player_secs$start_sec)
+class(gathered_player_secs$freq)
