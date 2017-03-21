@@ -41,10 +41,6 @@ df <- data.frame(seconds)
 
 test5 <- data.frame(seconds, x = "x")
 
-for (i in 1:length(away_gid)) {
-  test4 <- mutate(ifelse(df, seconds <= 2881, paste(seconds), FALSE))
-  df <- bind_cols(df, test4)}
-
 thing2 <- c(paste("g",away_gid, sep = ""))
 library(tidyverse)
 named_away <- away_gid
@@ -70,4 +66,28 @@ gid_secs_pbp <- left_join(gid_secs2, away_time, by = c("GAME_ID", "start_sec"))
 
 gid_sorted_pbp <- arrange(gid_secs_pbp, GAME_ID, start_sec)
 
+gid_sorted_pbp[[55]]
+
 gid_sorted_pbp <- fill(gid_sorted_pbp, GiannisAntetokounmpo)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MalcolmBrogdon)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MatthewDellavedova)
+gid_sorted_pbp <- fill(gid_sorted_pbp, TonySnell)
+gid_sorted_pbp <- fill(gid_sorted_pbp, GregMonroe)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JohnHenson)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MirzaTeletovic)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JasonTerry)
+gid_sorted_pbp <- fill(gid_sorted_pbp, KhrisMiddleton)
+gid_sorted_pbp <- fill(gid_sorted_pbp, ThonMaker)
+gid_sorted_pbp <- fill(gid_sorted_pbp, RashadVaughn)
+gid_sorted_pbp <- fill(gid_sorted_pbp, SpencerHawes)
+gid_sorted_pbp <- fill(gid_sorted_pbp, TerrenceJones)
+gid_sorted_pbp <- fill(gid_sorted_pbp, AxelToupane)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MichaelBeasley)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JabariParker)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MilesPlumlee)
+gid_sorted_pbp <- fill(gid_sorted_pbp, SteveNovak)
+
+write.csv(gid_sorted_pbp, file = "data/gid_sorted_pbp.csv", row.names = FALSE)
+
+colnames(gid_sorted_pbp[55:72])
+
