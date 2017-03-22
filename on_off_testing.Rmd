@@ -490,6 +490,29 @@ ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
   theme(panel.spacing.y =unit(.02, "lines"))
 ```
 
+```{r filtered plot, fig.width=10}
+filtered_psecs <- gathered_player_secs %>%
+  filter(player_tot_secs > 6000)
+
+ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "turquoise") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
 ----
 ```{r sessionInfo}
 sessionInfo()
