@@ -46,8 +46,6 @@ df <- data.frame(seconds)
 
 
 library(tidyverse)
-## join away and home gid vectors
-combo_gid <- c(away_gid, home_gid)
 ## create variable to be row name (can't start w/ number)
 g_combo <- c(paste("g",combo_gid, sep = ""))
 named_combo <- combo_gid
@@ -127,8 +125,7 @@ total_player_secs <- player_secs_sum %>%
 total_player_secs <- total_player_secs %>%
   mutate(tot_rank = dense_rank(tot_secs))
 
-library(forcats)
-## create a version using gather
+
 ## add total player secs to gathered
 gathered_player_secs$player_tot_secs <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_secs
 pids_1617$player_tot_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_secs
@@ -141,6 +138,7 @@ ordered_pname <- pids_1617 %>%
 
 ordered_pnames <- ordered_pname$pname
 
+library(forcats)
 gathered_player_secs$player <- factor(gathered_player_secs$player, levels = ordered_pnames)
 ## check if factor
 class(gathered_player_secs$player)
@@ -161,7 +159,6 @@ ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
   theme(axis.ticks = element_blank())
 
 ## non-faceted
-## faceted option
 ggplot(gathered_player_secs,aes(x=second,y=player,fill=freq)) +
   geom_tile(alpha = 0.9) +
   scale_fill_gradient(low = "grey90", high = "gold") +

@@ -80,11 +80,13 @@ away_1617 <- games_1617 %>%
 ## home game id and away game id vectors
 home_gid <- home_1617$GAME_ID
 away_gid <- away_1617$GAME_ID
+## combo gid vector
+combo_gid <- c(away_gid, home_gid)
 ```
 
 Use the game ids for the home and away games to separate play-by-play data for each, and convert seconds remaining in each quarter to running elapsed-time variables.
 
-We'll also add a `players` column containing the five players for the desierd team on the court for any given observation/event number.
+We'll also add a `players` column containing the five players for the desired team on the court for any given observation/event number. Note that we are excluding overtime by filtering on `PERIOD <= 4`. 
 
 
 ```r
@@ -191,6 +193,7 @@ Isolate list of relevant player/person IDs for this season.
 
 
 ```r
+## all players from pbp and then reduce to unique
 ## get 1617 season pids
 pids_1617 <- pbp_1617$PLAYER1_ID
 
@@ -204,7 +207,7 @@ pids_1617 <- pids_1617 %>%
 ## get player name
 pids_1617$player_name <- nba_person_ids[match(pids_1617$pid, nba_person_ids$personId),]$playerName
 
-## create player name column without spaces
+## create player name column without spaces to use as colname
 pids_1617 <- pids_1617 %>%
   mutate(pname = str_replace_all(string = pids_1617$player_name, pattern = " ", replacement = ""))
 ```
@@ -246,6 +249,7 @@ head(home_v_min$players, n = 5)
 ## [5] "203114, 203503, 202328, 203507, 203521"
 ```
 
+We could manually check for each player's `pid` and add variables with their respective (spaceless) names.
 
 
 ```r
@@ -260,16 +264,10 @@ home_v_min2 <- home_v_min %>%
   mutate(MatthewDellavedova = if_else(grepl("203521", players), 1, 0))
 ```
 
+However, that would be repetitive, so we'll make a function to do that for us. 
+
 
 ```r
-## nope uses "pname" as actual colname
-player_on_off <- function(df, pid, pname){
-  pof <- ifelse(grepl(pid, df$players), 1, 0)
-  pof_df <- data_frame(pof)
-  new_df <- bind_cols(df, pof_df)
-  new_df <- rename(new_df, pname = pof)
-}
-
 ## this pne actually works
 pfunner <- function(df, pid, pname) {
   mutate_call <- lazyeval::interp(~ if_else(grepl(a, players), 1, 0), a = deparse(as.name(pid)))
@@ -277,7 +275,7 @@ pfunner <- function(df, pid, pname) {
 }
 ```
 
-However, we'll need an equivalent variable for all of the players.
+A named list will come in handy, so let's build that quickly as well.
 
 
 ```r
@@ -291,24 +289,16 @@ named_pids <- pid_vec
 
 names(named_pids) <- pname_vec
 
-names(named_pids[1])
-```
-
-```
-## [1] "GiannisAntetokounmpo"
-```
-
-```r
 named_pids
 ```
 
 ```
-## GiannisAntetokounmpo       MalcolmBrogdon   MatthewDellavedova 
-##               203507              1627763               203521 
-##            TonySnell           GregMonroe           JohnHenson 
-##               203503               202328               203089 
-##       MirzaTeletovic           JasonTerry       KhrisMiddleton 
-##               203141                 1891               203114 
+##           JohnHenson       KhrisMiddleton            TonySnell 
+##               203089               203114               203503 
+##       MalcolmBrogdon GiannisAntetokounmpo           JasonTerry 
+##              1627763               203507                 1891 
+##   MatthewDellavedova           GregMonroe       MirzaTeletovic 
+##               203521               202328               203141 
 ##            ThonMaker         RashadVaughn         SpencerHawes 
 ##              1627748              1626173               201150 
 ##        TerrenceJones          AxelToupane       MichaelBeasley 
@@ -318,40 +308,26 @@ named_pids
 ```
 
 
+We can turn `named_pids` into a `tibble` using `enframe()`. 
 
-
-```r
-names(named_pids)
-```
-
-```
-##  [1] "GiannisAntetokounmpo" "MalcolmBrogdon"       "MatthewDellavedova"  
-##  [4] "TonySnell"            "GregMonroe"           "JohnHenson"          
-##  [7] "MirzaTeletovic"       "JasonTerry"           "KhrisMiddleton"      
-## [10] "ThonMaker"            "RashadVaughn"         "SpencerHawes"        
-## [13] "TerrenceJones"        "AxelToupane"          "MichaelBeasley"      
-## [16] "JabariParker"         "MilesPlumlee"         "SteveNovak"
-```
 
 ```r
 name_tibble <- enframe(named_pids, name = "pname", value = "pid")
 ```
 
+Now we can use a for loop to create a column for each player saying whether he was on the court at a given second in a given game. 
+
 
 ```r
-## df_list <- as.list(rep(home_v_min), each=18)
-
-## args2 <- list(pid = pid_list, pname = pname_list)
-
 ## works, using named list of player ids 
 ## manually passing the name of the game data frame
-output <- for (i in 1:length(named_pids)) {
+home_v_min_players <- for (i in 1:length(named_pids)) {
   test4 <- pfunner(home_v_min, pname = names(named_pids[i]), pid = named_pids[[i]])
   home_v_min <- test4
 }
-
-test3 <- pfunner(home_v_min, pname = names(named_pids[2]), pid = named_pids[[2]])
 ```
+
+Ok, now let's try that for all of the home games, and then for all of the away games.
 
 
 ```r
@@ -367,6 +343,277 @@ for (i in 1:length(named_pids)) {
   away_test <- test4
 }
 ```
+
+Because we now have our players identified as variables, we can now bind the away game and home game observations into a single data frame.
+
+
+```r
+combo_pbp <- bind_rows(away_test, home_test)
+```
+
+Now we'll make some time variables that will make it easier to fill in the blanks later on.
+
+
+```r
+## get elapsed time for event number
+combo_elapse <- combo_pbp %>%
+  mutate(duration = tsecs_elapsed - lead(tsecs_elapsed))
+
+## get only the non-negative values
+pos_duration <- combo_elapse %>%
+  filter(duration > -1)
+
+## within game rank
+within_rank <- pos_duration %>%
+  group_by(GAME_ID) %>%
+  mutate(within_rank = order(GAME_ID, desc(EVENTNUM), decreasing=TRUE))
+
+start_var <- within_rank %>%
+  mutate(start_sec = ifelse(within_rank == 1, 0, (lead(tsecs_elapsed) + 1)))
+
+## end var
+rev_within_rank <- start_var %>%
+  group_by(GAME_ID) %>%
+  mutate(rev_win = order(GAME_ID, EVENTNUM, decreasing=TRUE))
+
+end_var <- rev_within_rank %>%
+  mutate(end_sec = ifelse(rev_win == 1, 2880, tsecs_elapsed))
+
+## get rid of starts before ends
+pos_time <- end_var %>%
+  filter(end_sec >= start_sec)
+
+combo_time <- pos_time
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(combo_time, pname = names(named_pids[i]), pid = named_pids[[i]])
+  combo_time <- test4
+}
+```
+
+We'll now group the records by `GAME_ID` and arrange them in order by `start_sec`.
+
+
+```r
+combo_time <- combo_time %>%
+  group_by(GAME_ID) %>%
+  arrange(GAME_ID, start_sec)
+```
+
+We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds).
+
+```r
+seconds <- c(0:2880)
+df <- data.frame(seconds)
+```
+
+Because we'll be working with each second of each game, we'll combine the two. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
+
+
+```r
+## create variable to be row name (can't start w/ number)
+g_combo <- c(paste("g",combo_gid, sep = ""))
+named_combo <- combo_gid
+## use row-name variable to name combo gid vector
+names(named_combo) <- g_combo
+game_time <- enframe(named_combo, name = "g_combo", value = "combo_gid")
+```
+
+Since we want a record for each second of each game, we'll need to repeat the vector of seconds by the number of games played. In order to keep the game ids in a specified order, we'll create a list.
+
+
+```r
+## repeat seconds variable per number of games for new df
+repeated_secs <- rep(c(0:2880), each=length(combo_gid))
+repeated_sec2 <- data.frame(repeated_secs)
+combo_list <- as.list(combo_gid)
+## create game id per seconds (2881, or length of seconds vector)
+combo_gids <- rep(c(combo_list), times=length(seconds))
+combo_gids <- data_frame(combo_gids)
+## bind
+gid_secs <- bind_cols(repeated_sec2, combo_gids)
+```
+
+Now we'll prepare a our data frame so that we can join it with our records from the play-by-play data. Then we can join our play-by-play observations to the matching game id and starting second.
+
+
+```r
+## create df with key cols for joining
+gid_secs2 <- gid_secs %>%
+  rename(start_sec = repeated_secs) %>%
+  rename(GAME_ID = combo_gids) %>%
+  mutate(GAME_ID = as.character(GAME_ID))
+## left join (keep all for full length) by key cols
+gid_secs_pbp <- left_join(gid_secs2, combo_time, by = c("GAME_ID", "start_sec"))
+```
+
+Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+
+```r
+## important to sort by GAME_ID **
+gid_sorted_pbp <- gid_secs_pbp %>%
+  arrange(GAME_ID, start_sec) %>%
+  rename(second = start_sec)
+```
+
+Then we can fill in the player values for each second.
+## Note to self: turn into loop ##
+
+```r
+## filling previous column value
+gid_sorted_pbp <- fill(gid_sorted_pbp, GiannisAntetokounmpo)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MalcolmBrogdon)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MatthewDellavedova)
+gid_sorted_pbp <- fill(gid_sorted_pbp, TonySnell)
+gid_sorted_pbp <- fill(gid_sorted_pbp, GregMonroe)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JohnHenson)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MirzaTeletovic)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JasonTerry)
+gid_sorted_pbp <- fill(gid_sorted_pbp, KhrisMiddleton)
+gid_sorted_pbp <- fill(gid_sorted_pbp, ThonMaker)
+gid_sorted_pbp <- fill(gid_sorted_pbp, RashadVaughn)
+gid_sorted_pbp <- fill(gid_sorted_pbp, SpencerHawes)
+gid_sorted_pbp <- fill(gid_sorted_pbp, TerrenceJones)
+gid_sorted_pbp <- fill(gid_sorted_pbp, AxelToupane)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MichaelBeasley)
+gid_sorted_pbp <- fill(gid_sorted_pbp, JabariParker)
+gid_sorted_pbp <- fill(gid_sorted_pbp, MilesPlumlee)
+gid_sorted_pbp <- fill(gid_sorted_pbp, SteveNovak)
+
+write.csv(gid_sorted_pbp, file = "data/combo_gid_sorted_pbp.csv", row.names = FALSE)
+```
+
+## Creating a summary frame
+
+Because we want to know the frequency that each player was on the court for a given second, we can create a smaller data frame with just the seconds and spaceless player name (`pname`) variables.
+
+
+```r
+## create vector of desired columns
+select_cols <- c("second", pname_vec)
+## select those columns for new data frame
+player_seconds_df <- select(gid_sorted_pbp, one_of(c(select_cols)))
+```
+
+Now we'll summarize our data frame to get the total times that each player was on the court for each second.
+
+
+```r
+player_secs_sum <- player_seconds_df %>%
+  group_by(second) %>%
+  summarise_all(funs(sum))
+
+write.csv(player_secs_sum, file="data/combo_player_secs_sum.csv", row.names = FALSE)
+```
+
+Now we have a data frame with the information we want, but it is not tidy. So, we'll use `gather()` to clean things up.
+
+
+```r
+gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:19)
+```
+
+We'll also create a summary table with the total number of seconds played by each player, for the purposes of ordering the player variable later on, and add the calculated values to our existing data frames.
+
+```r
+total_player_secs <- player_secs_sum %>%
+  summarise_all(funs(sum)) %>%
+  rename(total = second) %>%
+  gather("player", "tot_secs", 1:19) %>%
+  filter(player != "total") %>%
+  arrange(desc(tot_secs))
+
+total_player_secs <- total_player_secs %>%
+  mutate(tot_rank = dense_rank(tot_secs))
+
+## add total player secs to gathered
+gathered_player_secs$player_tot_secs <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_secs
+pids_1617$player_tot_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_secs
+## and rank secs
+gathered_player_secs$player_tot_rank <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_rank
+pids_1617$player_tot_rank <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_rank
+```
+
+To get the players in their desired order for plotting, we'll create a new, _ordered_ vector of players, which we'll use as our `factor` levels.
+
+```r
+ordered_pname <- pids_1617 %>%
+  arrange(player_tot_secs)
+
+ordered_pnames <- ordered_pname$pname
+```
+
+Now we'll convert the `pname` variable into a factor, using the order built, above.
+
+
+```r
+library(forcats)
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = ordered_pnames)
+## check if factor
+class(gathered_player_secs$player)
+```
+
+```
+## [1] "factor"
+```
+
+
+
+## Plotting the Data
+
+
+```r
+ggplot(gathered_player_secs,aes(x=second,y=player,fill=freq)) +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "gold") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white") +
+  geom_vline(xintercept = 1440, color = "white") +
+  geom_vline(xintercept = 2160, color = "white") +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(panel.grid.minor = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.title.y = element_blank())
+```
+
+<img src="on_off_testing_files/figure-html/plot no facets-1.png" width="1000" />
+
+If we wanted to build the plot using facets, instead of players along the y-axis, we'll want to reverse the order of the `player` factor levels.
+
+
+```r
+rev_ordered_pname <- pids_1617 %>%
+  arrange(desc(player_tot_secs))
+
+rev_ordered_pnames <- rev_ordered_pname$pname
+
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = rev_ordered_pnames)
+```
+
+
+```r
+## faceted option
+ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "deeppink") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+<img src="on_off_testing_files/figure-html/faceted plot-1.png" width="1000" />
 
 ----
 
@@ -386,23 +633,24 @@ sessionInfo()
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] stringr_1.2.0   dplyr_0.5.0     purrr_0.2.2     tidyr_0.6.1    
-## [5] tibble_1.2      ggplot2_2.2.1   tidyverse_1.1.1 readr_1.0.0    
+## [1] forcats_0.2.0   stringr_1.2.0   dplyr_0.5.0     purrr_0.2.2    
+## [5] tidyr_0.6.1     tibble_1.2      ggplot2_2.2.1   tidyverse_1.1.1
+## [9] readr_1.0.0    
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_0.12.9        plyr_1.8.4         forcats_0.2.0     
-##  [4] tools_3.3.3        digest_0.6.12      packrat_0.4.8-1   
-##  [7] lubridate_1.6.0    jsonlite_1.3       evaluate_0.10     
-## [10] nlme_3.1-131       gtable_0.2.0       lattice_0.20-34   
-## [13] psych_1.6.12       DBI_0.6            yaml_2.1.14       
-## [16] parallel_3.3.3     haven_1.0.0        xml2_1.1.1        
-## [19] httr_1.2.1         knitr_1.15.1       hms_0.3           
-## [22] rprojroot_1.2      grid_3.3.3         R6_2.2.0          
-## [25] readxl_0.1.1       foreign_0.8-67     rmarkdown_1.3.9004
-## [28] modelr_0.1.0       reshape2_1.4.2     magrittr_1.5      
-## [31] backports_1.0.5    scales_0.4.1       htmltools_0.3.5   
-## [34] rvest_0.3.2        assertthat_0.1     mnormt_1.5-5      
-## [37] colorspace_1.3-2   stringi_1.1.2      lazyeval_0.2.0    
+##  [1] Rcpp_0.12.9        plyr_1.8.4         tools_3.3.3       
+##  [4] digest_0.6.12      packrat_0.4.8-1    lubridate_1.6.0   
+##  [7] jsonlite_1.3       evaluate_0.10      nlme_3.1-131      
+## [10] gtable_0.2.0       lattice_0.20-34    psych_1.6.12      
+## [13] DBI_0.6            yaml_2.1.14        parallel_3.3.3    
+## [16] haven_1.0.0        xml2_1.1.1         httr_1.2.1        
+## [19] knitr_1.15.1       hms_0.3            rprojroot_1.2     
+## [22] grid_3.3.3         R6_2.2.0           readxl_0.1.1      
+## [25] foreign_0.8-67     rmarkdown_1.3.9004 modelr_0.1.0      
+## [28] reshape2_1.4.2     magrittr_1.5       backports_1.0.5   
+## [31] scales_0.4.1       htmltools_0.3.5    rvest_0.3.2       
+## [34] assertthat_0.1     mnormt_1.5-5       colorspace_1.3-2  
+## [37] labeling_0.3       stringi_1.1.2      lazyeval_0.2.0    
 ## [40] munsell_0.4.3      broom_0.4.2
 ```
 
