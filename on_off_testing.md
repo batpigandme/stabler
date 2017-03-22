@@ -455,29 +455,13 @@ gid_sorted_pbp <- gid_secs_pbp %>%
   rename(second = start_sec)
 ```
 
-Then we can fill in the player values for each second.
-## Note to self: turn into loop ##
+Then we can fill in the player values for each second using the `fill()` function from `tidyr`.
+
 
 ```r
 ## filling previous column value
-gid_sorted_pbp <- fill(gid_sorted_pbp, GiannisAntetokounmpo)
-gid_sorted_pbp <- fill(gid_sorted_pbp, MalcolmBrogdon)
-gid_sorted_pbp <- fill(gid_sorted_pbp, MatthewDellavedova)
-gid_sorted_pbp <- fill(gid_sorted_pbp, TonySnell)
-gid_sorted_pbp <- fill(gid_sorted_pbp, GregMonroe)
-gid_sorted_pbp <- fill(gid_sorted_pbp, JohnHenson)
-gid_sorted_pbp <- fill(gid_sorted_pbp, MirzaTeletovic)
-gid_sorted_pbp <- fill(gid_sorted_pbp, JasonTerry)
-gid_sorted_pbp <- fill(gid_sorted_pbp, KhrisMiddleton)
-gid_sorted_pbp <- fill(gid_sorted_pbp, ThonMaker)
-gid_sorted_pbp <- fill(gid_sorted_pbp, RashadVaughn)
-gid_sorted_pbp <- fill(gid_sorted_pbp, SpencerHawes)
-gid_sorted_pbp <- fill(gid_sorted_pbp, TerrenceJones)
-gid_sorted_pbp <- fill(gid_sorted_pbp, AxelToupane)
-gid_sorted_pbp <- fill(gid_sorted_pbp, MichaelBeasley)
-gid_sorted_pbp <- fill(gid_sorted_pbp, JabariParker)
-gid_sorted_pbp <- fill(gid_sorted_pbp, MilesPlumlee)
-gid_sorted_pbp <- fill(gid_sorted_pbp, SteveNovak)
+## note: done by position, so double-check for different setup
+gid_sorted_pbp <- fill(gid_sorted_pbp, players:SteveNovak)
 
 write.csv(gid_sorted_pbp, file = "data/combo_gid_sorted_pbp.csv", row.names = FALSE)
 ```
