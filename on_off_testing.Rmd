@@ -51,7 +51,6 @@ advanced_boxscores <- read_csv("data/advanced_boxscores.csv", col_types = cols(M
 
 ```{r filter season}
 ## filter games to this season
-library(tidyverse)
 pbp_1617 <- pbp %>%
   mutate(GAME_NUMERIC = as.numeric(GAME_ID)) %>%
   filter(GAME_NUMERIC >= 21600008) %>%
@@ -175,7 +174,7 @@ home_v_min <- home_pbp %>%
   filter(GAME_ID == "0021600978")
 ```
 
-## Adding logical player columns
+### Adding logical player columns
 
 Now we want to determine whether or not a player was on the court for each of the observations. For example, we might create a variable for Giannis Antetokounmpo that looks and sees if his corresponding player ID number is in the `players` column we created earlier (which, in case you forgot, you can see five rows of, below).
 
@@ -224,16 +223,15 @@ named_pids
 ```
 
 
-We can turn `named_pids` into a `tibble` using `enframe()`. 
+_Though we don't need to do so for this exercise,_ we _can_ turn `named_pids` into a `tibble` using `enframe()`. 
 
-```{r}
+```{r name tibble}
 name_tibble <- enframe(named_pids, name = "pname", value = "pid")
 ```
 
 Now we can use a for loop to create a column for each player saying whether he was on the court at a given second in a given game. 
 
-```{r}
-
+```{r home v min ptest}
 ## works, using named list of player ids 
 ## manually passing the name of the game data frame
 home_v_min_players <- for (i in 1:length(named_pids)) {
@@ -241,6 +239,8 @@ home_v_min_players <- for (i in 1:length(named_pids)) {
   home_v_min <- test4
 }
 ```
+
+## All the Games Untidied
 
 Ok, now let's try that for all of the home games, and then for all of the away games.
 
@@ -310,13 +310,14 @@ combo_time <- combo_time %>%
   arrange(GAME_ID, start_sec)
 ```
 
-We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds).
+We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds, which have be a length of 2,881).
+
 ```{r seconds df}
 seconds <- c(0:2880)
 df <- data.frame(seconds)
 ```
 
-Because we'll be working with each second of each game, we'll combine the two. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
+We'll be working with each second of each game, so we'll create a frame with `x` number of each second, one per game. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
 
 ```{r}
 ## create variable to be row name (can't start w/ number)
@@ -335,6 +336,7 @@ repeated_secs <- rep(c(0:2880), each=length(combo_gid))
 repeated_sec2 <- data.frame(repeated_secs)
 combo_list <- as.list(combo_gid)
 ## create game id per seconds (2881, or length of seconds vector)
+## note: repeating list retains order
 combo_gids <- rep(c(combo_list), times=length(seconds))
 combo_gids <- data_frame(combo_gids)
 ## bind
@@ -353,7 +355,8 @@ gid_secs2 <- gid_secs %>%
 gid_secs_pbp <- left_join(gid_secs2, combo_time, by = c("GAME_ID", "start_sec"))
 ```
 
-Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells/`NA`s. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+
 ```{r}
 ## important to sort by GAME_ID **
 gid_sorted_pbp <- gid_secs_pbp %>%
@@ -490,6 +493,8 @@ ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
   theme(panel.spacing.y =unit(.02, "lines"))
 ```
 
+We could also restrict the players included in our plot by, say, total seconds played. For example, let's include only players whose total seconds exceed 6,000 (100 minutes).
+
 ```{r filtered plot, fig.width=10}
 filtered_psecs <- gathered_player_secs %>%
   filter(player_tot_secs > 6000)
@@ -498,6 +503,59 @@ ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
   facet_grid(player~., switch = "y") +
   geom_tile(alpha = 0.9) +
   scale_fill_gradient(low = "grey90", high = "turquoise") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+If we wanted to focus our visualization on starters vs. non-starters, we could re-sort our player factor by the number of times a player was on at the start of the game (i.e. when zero seconds had elapsed).
+
+```{r include=FALSE}
+player_first_secs <- player_secs_sum %>%
+  filter(second < 1) %>%
+  summarise_all(funs(sum)) %>%
+  rename(total = second) %>%
+  gather("player", "first_sec", 1:19) %>%
+  filter(player != "total") %>%
+  arrange(desc(first_sec))
+
+## join to total player secs frame
+total_player_secs <- left_join(total_player_secs, player_first_secs, by = "player")
+
+## join to pid_1617 using match bc no common var name
+pids_1617$player_first_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$first_sec
+
+## arrange by first sec plus secondary for ties
+first_sec_ordered_pname <- pids_1617 %>%
+  arrange(desc(player_first_secs), desc(player_tot_secs))
+
+fs_ordered_pnames <- first_sec_ordered_pname$pname
+
+## use first second ordered names as levels for pname factor
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = fs_ordered_pnames)
+
+## filter for more than 100 mins
+filtered_psecs <- gathered_player_secs %>%
+  filter(player_tot_secs > 6000)
+```
+
+We'll filter for players with over 100 minutes, as we did in the previous chart.
+
+```{r fs ordered, fig.width=10}
+ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "mediumblue") +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_discrete(expand = c(0,0)) +
   geom_vline(xintercept = 720, color = "white", size = 0.2) +

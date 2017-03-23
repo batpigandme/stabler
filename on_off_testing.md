@@ -49,7 +49,6 @@ advanced_boxscores <- read_csv("data/advanced_boxscores.csv", col_types = cols(M
 
 ```r
 ## filter games to this season
-library(tidyverse)
 pbp_1617 <- pbp %>%
   mutate(GAME_NUMERIC = as.numeric(GAME_ID)) %>%
   filter(GAME_NUMERIC >= 21600008) %>%
@@ -232,7 +231,7 @@ home_v_min <- home_pbp %>%
   filter(GAME_ID == "0021600978")
 ```
 
-## Adding logical player columns
+### Adding logical player columns
 
 Now we want to determine whether or not a player was on the court for each of the observations. For example, we might create a variable for Giannis Antetokounmpo that looks and sees if his corresponding player ID number is in the `players` column we created earlier (which, in case you forgot, you can see five rows of, below).
 
@@ -293,22 +292,22 @@ named_pids
 ```
 
 ```
-##           JohnHenson       KhrisMiddleton            TonySnell 
-##               203089               203114               203503 
-##       MalcolmBrogdon GiannisAntetokounmpo           JasonTerry 
-##              1627763               203507                 1891 
-##   MatthewDellavedova           GregMonroe       MirzaTeletovic 
-##               203521               202328               203141 
-##            ThonMaker         RashadVaughn         SpencerHawes 
-##              1627748              1626173               201150 
-##        TerrenceJones          AxelToupane       MichaelBeasley 
-##               203093              1626253               201563 
+##        TerrenceJones         RashadVaughn       MalcolmBrogdon 
+##               203093              1626173              1627763 
+##         SpencerHawes            TonySnell GiannisAntetokounmpo 
+##               201150               203503               203507 
+##       KhrisMiddleton       MirzaTeletovic           JasonTerry 
+##               203114               203141                 1891 
+##   MatthewDellavedova           GregMonroe            ThonMaker 
+##               203521               202328              1627748 
+##           JohnHenson          AxelToupane       MichaelBeasley 
+##               203089              1626253               201563 
 ##         JabariParker         MilesPlumlee           SteveNovak 
 ##               203953               203101               200779
 ```
 
 
-We can turn `named_pids` into a `tibble` using `enframe()`. 
+_Though we don't need to do so for this exercise,_ we _can_ turn `named_pids` into a `tibble` using `enframe()`. 
 
 
 ```r
@@ -326,6 +325,8 @@ home_v_min_players <- for (i in 1:length(named_pids)) {
   home_v_min <- test4
 }
 ```
+
+## All the Games Untidied
 
 Ok, now let's try that for all of the home games, and then for all of the away games.
 
@@ -399,14 +400,15 @@ combo_time <- combo_time %>%
   arrange(GAME_ID, start_sec)
 ```
 
-We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds).
+We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds, which have be a length of 2,881).
+
 
 ```r
 seconds <- c(0:2880)
 df <- data.frame(seconds)
 ```
 
-Because we'll be working with each second of each game, we'll combine the two. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
+We'll be working with each second of each game, so we'll create a frame with `x` number of each second, one per game. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
 
 
 ```r
@@ -427,6 +429,7 @@ repeated_secs <- rep(c(0:2880), each=length(combo_gid))
 repeated_sec2 <- data.frame(repeated_secs)
 combo_list <- as.list(combo_gid)
 ## create game id per seconds (2881, or length of seconds vector)
+## note: repeating list retains order
 combo_gids <- rep(c(combo_list), times=length(seconds))
 combo_gids <- data_frame(combo_gids)
 ## bind
@@ -446,7 +449,8 @@ gid_secs2 <- gid_secs %>%
 gid_secs_pbp <- left_join(gid_secs2, combo_time, by = c("GAME_ID", "start_sec"))
 ```
 
-Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells/`NA`s. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+
 
 ```r
 ## important to sort by GAME_ID **
@@ -599,6 +603,8 @@ ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
 
 <img src="on_off_testing_files/figure-html/faceted plot-1.png" width="1000" />
 
+We could also restrict the players included in our plot by, say, total seconds played. For example, let's include only players whose total seconds exceed 6,000 (100 minutes).
+
 
 ```r
 filtered_psecs <- gathered_player_secs %>%
@@ -625,6 +631,35 @@ ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
 
 <img src="on_off_testing_files/figure-html/filtered plot-1.png" width="1000" />
 
+If we wanted to focus our visualization on starters vs. non-starters, we could re-sort our player factor by the number of times a player was on at the start of the game (i.e. when zero seconds had elapsed).
+
+
+
+We'll filter for players with over 100 minutes, as we did in the previous chart.
+
+
+```r
+ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "mediumblue") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+<img src="on_off_testing_files/figure-html/fs ordered-1.png" width="1000" />
+
 ----
 
 ```r
@@ -648,7 +683,7 @@ sessionInfo()
 ## [9] readr_1.0.0    
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_0.12.9        plyr_1.8.4         tools_3.3.3       
+##  [1] Rcpp_0.12.10       plyr_1.8.4         tools_3.3.3       
 ##  [4] digest_0.6.12      packrat_0.4.8-1    lubridate_1.6.0   
 ##  [7] jsonlite_1.3       evaluate_0.10      nlme_3.1-131      
 ## [10] gtable_0.2.0       lattice_0.20-34    psych_1.6.12      
