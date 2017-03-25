@@ -11,7 +11,7 @@
 
 <meta name="author" content="Mara Averick" />
 
-<meta name="date" content="2017-03-23" />
+<meta name="date" content="2017-03-25" />
 
 <title>On/Off Testing</title>
 
@@ -119,16 +119,22 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">On/Off Testing</h1>
 <h4 class="author"><em>Mara Averick</em></h4>
-<h4 class="date"><em>2017-03-23</em></h4>
+<h4 class="date"><em>2017-03-25</em></h4>
 
 </div>
 
 
+<div id="getting-the-data" class="section level2">
+<h2>Getting the data</h2>
+<pre class="sql"><code>SELECT * FROM `pbp` WHERE `PLAYER1_TEAM_ID` = 1610612749 ORDER BY `GAME_ID` DESC</code></pre>
+<pre class="sql"><code>SELECT * FROM `games` WHERE `TEAM_ID` = 1610612749 AND `SEASON` = '2016-17' ORDER BY `DATE` ASC </code></pre>
+<pre class="sql"><code>SELECT * FROM `advanced_boxscores` WHERE `TEAM_ID` = 1610612749 ORDER BY `GAME_ID` DESC </code></pre>
+</div>
+<div id="read-the-data-in" class="section level2">
+<h2>Read the data in</h2>
 <pre class="r"><code>library(readr)
 library(tidyverse)
 library(stringr)</code></pre>
-<div id="read-the-data-in" class="section level2">
-<h2>Read the data in</h2>
 <pre class="r"><code>## read in NBA person IDs
 nba_person_ids &lt;- read_csv(&quot;~/nba_stats_docs/other/data/nba_personIds.csv&quot;)</code></pre>
 <pre class="r"><code>## read in pbp
@@ -467,12 +473,14 @@ player_seconds_df &lt;- select(gid_sorted_pbp, one_of(c(select_cols)))</code></p
 
 write.csv(player_secs_sum, file=&quot;data/combo_player_secs_sum.csv&quot;, row.names = FALSE)</code></pre>
 <p>Now we have a data frame with the information we want, but it is not tidy. So, we’ll use <code>gather()</code> to clean things up.</p>
-<pre class="r"><code>gathered_player_secs &lt;- gather(player_secs_sum, &quot;player&quot;, &quot;freq&quot;, 2:19)</code></pre>
+<pre class="r"><code>## note: change depending on number of players
+gathered_player_secs &lt;- gather(player_secs_sum, &quot;player&quot;, &quot;freq&quot;, 2:length(select_cols))</code></pre>
 <p>We’ll also create a summary table with the total number of seconds played by each player, for the purposes of ordering the player variable later on, and add the calculated values to our existing data frames.</p>
-<pre class="r"><code>total_player_secs &lt;- player_secs_sum %&gt;%
+<pre class="r"><code>## note: change depending on number of players
+total_player_secs &lt;- player_secs_sum %&gt;%
   summarise_all(funs(sum)) %&gt;%
   rename(total = second) %&gt;%
-  gather(&quot;player&quot;, &quot;tot_secs&quot;, 1:19) %&gt;%
+  gather(&quot;player&quot;, &quot;tot_secs&quot;, 1:length(select_cols)) %&gt;%
   filter(player != &quot;total&quot;) %&gt;%
   arrange(desc(tot_secs))
 

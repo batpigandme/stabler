@@ -4,14 +4,31 @@ Mara Averick
 
 
 
+## Getting the data
+
+
+```sql
+SELECT * FROM `pbp` WHERE `PLAYER1_TEAM_ID` = 1610612749 ORDER BY `GAME_ID` DESC
+```
+
+
+```sql
+SELECT * FROM `games` WHERE `TEAM_ID` = 1610612749 AND `SEASON` = '2016-17' ORDER BY `DATE` ASC 
+```
+
+
+```sql
+SELECT * FROM `advanced_boxscores` WHERE `TEAM_ID` = 1610612749 ORDER BY `GAME_ID` DESC 
+```
+
+## Read the data in
+
 
 ```r
 library(readr)
 library(tidyverse)
 library(stringr)
 ```
-
-## Read the data in
 
 
 ```r
@@ -497,16 +514,18 @@ Now we have a data frame with the information we want, but it is not tidy. So, w
 
 
 ```r
-gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:19)
+## note: change depending on number of players
+gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:length(select_cols))
 ```
 
 We'll also create a summary table with the total number of seconds played by each player, for the purposes of ordering the player variable later on, and add the calculated values to our existing data frames.
 
 ```r
+## note: change depending on number of players
 total_player_secs <- player_secs_sum %>%
   summarise_all(funs(sum)) %>%
   rename(total = second) %>%
-  gather("player", "tot_secs", 1:19) %>%
+  gather("player", "tot_secs", 1:length(select_cols)) %>%
   filter(player != "total") %>%
   arrange(desc(tot_secs))
 
