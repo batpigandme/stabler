@@ -1,0 +1,598 @@
+---
+title: "OKC On/Off Testing"
+author: "Mara Averick"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dev = 'png', dpi = 100, fig.retina = 2)
+```
+
+## Getting the data
+
+```{sql, eval = FALSE}
+SELECT * FROM `pbp` WHERE `PLAYER1_TEAM_ID` = 1610612760 ORDER BY `GAME_ID` DESC
+```
+
+```{sql, eval = FALSE}
+SELECT * FROM `games` WHERE `TEAM_ID` = 1610612760 AND `SEASON` = '2016-17' ORDER BY `DATE` ASC 
+```
+
+```{sql, eval = FALSE}
+SELECT * FROM `advanced_boxscores` WHERE `TEAM_ID` = 1610612760 ORDER BY `GAME_ID` DESC 
+```
+
+## Read the data in
+
+```{r load libraries, message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+library(stringr)
+```
+
+```{r read PIDs, message=FALSE}
+## read in NBA person IDs
+nba_person_ids <- read_csv("~/nba_stats_docs/other/data/nba_personIds.csv")
+```
+
+```{r read pbp, message=FALSE, warning=FALSE}
+## read in pbp
+pbp <- read_csv("data/okc/pbp.csv",
+                col_types = cols(HOME_PLAYER1 = col_character(),
+                                 HOME_PLAYER2 = col_character(),
+                                 HOME_PLAYER3 = col_character(),
+                                 HOME_PLAYER4 = col_character(),
+                                 HOME_PLAYER5 = col_character(),
+                                 VISITOR_PLAYER1 = col_character(),
+                                 VISITOR_PLAYER2 = col_character(),
+                                 VISITOR_PLAYER3 = col_character(),
+                                 VISITOR_PLAYER4 = col_character(),
+                                 VISITOR_PLAYER5 = col_character()))
+```
+
+```{r read games and box, message=FALSE, warning=FALSE}
+## read in games
+games <-  read_csv("data/okc/games.csv")
+
+## read in boxscores
+advanced_boxscores <- read_csv("data/okc/advanced_boxscores.csv", col_types = cols(MIN = col_character()))
+```
+
+## Isolate 2016-2017 season
+
+```{r filter season}
+## filter games to this season
+pbp_1617 <- pbp %>%
+  mutate(GAME_NUMERIC = as.numeric(GAME_ID)) %>%
+  filter(GAME_NUMERIC >= 21600008) %>%
+  filter(GAME_NUMERIC < 41400121)
+
+games_1617 <- games %>%
+  mutate(GAME_NUMERIC = as.numeric(GAME_ID)) %>%
+  filter(GAME_NUMERIC >= 21600008) %>%
+  filter(GAME_NUMERIC < 41400121)
+
+box_1617 <- advanced_boxscores %>%
+  mutate(GAME_NUMERIC = as.numeric(GAME_ID)) %>%
+  filter(GAME_NUMERIC >= 21600008) %>%
+  filter(GAME_NUMERIC < 41400121)
+```
+
+## Home vs Away
+Because the columns containing the relevant data depend on whether the game was played at home or away, we'll separate those out in order to create a list of team players on the floor.
+
+```{r home v away}
+## home vs away games
+home_1617 <- games_1617 %>%
+  filter(AT_HOME == 1)
+
+away_1617 <- games_1617 %>%
+  filter(AT_HOME == 0)
+
+## home game id and away game id vectors
+home_gid <- home_1617$GAME_ID
+away_gid <- away_1617$GAME_ID
+## combo gid vector
+combo_gid <- c(away_gid, home_gid)
+
+```
+
+Use the game ids for the home and away games to separate play-by-play data for each, and convert seconds remaining in each quarter to running elapsed-time variables.
+
+We'll also add a `players` column containing the five players for the desired team on the court for any given observation/event number. Note that we are excluding overtime by filtering on `PERIOD <= 4`. 
+
+```{r home away pbp}
+## home play by play
+home_pbp <- pbp_1617 %>%
+  filter(GAME_ID %in% home_gid) %>%
+  filter(PERIOD <= 4) %>%
+  mutate(qsecs_elapsed = 720 - SECONDS_REMAINING) %>%
+  mutate(tsecs_elapsed = ((PERIOD -1) * 720) + qsecs_elapsed) %>%
+  mutate(players = paste(HOME_PLAYER1, HOME_PLAYER2, HOME_PLAYER3, HOME_PLAYER4, HOME_PLAYER5, sep = ", "))
+
+## away play by play
+away_pbp <- pbp_1617 %>%
+  filter(GAME_ID %in% away_gid) %>%
+  filter(PERIOD <= 4) %>%
+  mutate(qsecs_elapsed = 720 - SECONDS_REMAINING) %>%
+  mutate(tsecs_elapsed = ((PERIOD -1) * 720) + qsecs_elapsed) %>%
+  mutate(players = paste(VISITOR_PLAYER1, VISITOR_PLAYER2, VISITOR_PLAYER3, VISITOR_PLAYER4, VISITOR_PLAYER5, sep = ", "))
+
+```
+
+Now we have a data frame with a few more variables.
+```{r glimpse}
+glimpse(home_pbp)
+```
+
+
+## Gathering Observations
+
+One way to approach this, would be to gather the data such that you have an observation for each of the players on the court for a given event.
+
+```{r gathered mode}
+home_players_pbp <- home_pbp %>%
+  gather("player_num", "pid_on", 36:40)
+
+home_players_pbp$player_on <- nba_person_ids[match(home_players_pbp$pid_on, nba_person_ids$personId),]$playerName
+
+away_players_pbp <- away_pbp %>%
+  gather("player_num", "pid_on", 41:45)
+
+away_players_pbp$player_on <- nba_person_ids[match(away_players_pbp$pid_on, nba_person_ids$personId),]$playerName
+```
+
+Another way to look at this would be as a sort of matrix where there is a logical variable for each player for each observation. To do so, let's take a closer look at player ids.
+
+## Player names and IDs
+
+Isolate list of relevant player/person IDs for this season.
+
+```{r 1617 pids}
+## all players from pbp and then reduce to unique
+## get 1617 season pids
+pids_1617 <- pbp_1617$PLAYER1_ID
+
+pids_1617 <- data_frame(pids_1617)
+
+pids_1617 <- unique(pids_1617)
+
+pids_1617 <- pids_1617 %>%
+  rename(pid = pids_1617)
+
+## get player name
+pids_1617$player_name <- nba_person_ids[match(pids_1617$pid, nba_person_ids$personId),]$playerName
+
+## create player name column without spaces to use as colname
+pids_1617 <- pids_1617 %>%
+  mutate(pname = str_replace_all(string = pids_1617$player_name, pattern = " ", replacement = ""))
+
+## remove cases where there is no name
+pids_1617 <- filter(pids_1617, !is.na(pname))
+```
+
+Build vectors of player IDs and spaceless player names.
+
+```{r player vecs}
+pid_vec <- pids_1617$pid
+
+pname_vec <- pids_1617$pname
+```
+
+## Test Game
+
+For starters, let's just take a look at a single game, which we can do by filtering on `GAME_ID`. Remember, it's important to note whether the game was home, or away, as that dictates the relevant columns containing player id values.
+
+```{r ex game}
+## home game vs MIN
+home_v_min <- home_pbp %>%
+  filter(GAME_ID == "0021600459")
+```
+
+### Adding logical player columns
+
+Now we want to determine whether or not a player was on the court for each of the observations. For example, we might create a variable for Giannis Antetokounmpo that looks and sees if his corresponding player ID number is in the `players` column we created earlier (which, in case you forgot, you can see five rows of, below).
+
+```{r glimpse players}
+head(home_v_min$players, n = 5)
+```
+
+We could manually check for each player's `pid` and add variables with their respective (spaceless) names.
+
+```{r russ}
+## testing ways to build on/off matrix
+home_v_min$RussellWestbrook <- ifelse(grepl("201566", home_v_min$players), 1, 0)
+
+home_v_min2 <- home_v_min
+
+home_v_min2$StevenAdams <- if_else(grepl("203500", home_v_min2$players), 1, 0)
+
+home_v_min2 <- home_v_min %>%
+  mutate(StevenAdams = if_else(grepl("203500", players), 1, 0))
+```
+
+However, that would be repetitive, so we'll make a function to do that for us. 
+
+```{r pcheck funs}
+## this pne actually works
+pfunner <- function(df, pid, pname) {
+  mutate_call <- lazyeval::interp(~ if_else(grepl(a, players), 1, 0), a = deparse(as.name(pid)))
+  df %>% mutate_(.dots = setNames(list(mutate_call), pname))
+}
+```
+
+A named list will come in handy, so let's build that quickly as well.
+
+```{r named list}
+## pid list
+pid_list <- as.list(pids_1617$pid)
+
+pname_list <- as.list(pids_1617$pname)
+
+## name pid_vec
+named_pids <- pid_vec
+
+names(named_pids) <- pname_vec
+
+named_pids
+```
+
+
+_Though we don't need to do so for this exercise,_ we _can_ turn `named_pids` into a `tibble` using `enframe()`. 
+
+```{r name tibble}
+name_tibble <- enframe(named_pids, name = "pname", value = "pid")
+```
+
+Now we can use a for loop to create a column for each player saying whether he was on the court at a given second in a given game. 
+
+```{r home v min ptest}
+## works, using named list of player ids 
+## manually passing the name of the game data frame
+home_v_min_players <- for (i in 1:length(named_pids)) {
+  test4 <- pfunner(home_v_min, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_v_min <- test4
+}
+```
+
+## All the Games Untidied
+
+Ok, now let's try that for all of the home games, and then for all of the away games.
+
+```{r}
+home_test <- home_pbp
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(home_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  home_test <- test4
+}
+
+away_test <- away_pbp
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(away_test, pname = names(named_pids[i]), pid = named_pids[[i]])
+  away_test <- test4
+}
+```
+
+Because we now have our players identified as variables, we can now bind the away game and home game observations into a single data frame.
+
+```{r}
+combo_pbp <- bind_rows(home_test, away_test)
+```
+
+Now we'll make some time variables that will make it easier to fill in the blanks later on.
+
+```{r time vars}
+## get elapsed time for event number
+combo_elapse <- combo_pbp %>%
+  mutate(duration = tsecs_elapsed - lead(tsecs_elapsed))
+
+## get only the non-negative values
+pos_duration <- combo_elapse %>%
+  filter(duration > -1)
+
+## within game rank
+within_rank <- pos_duration %>%
+  group_by(GAME_ID) %>%
+  mutate(within_rank = order(GAME_ID, desc(EVENTNUM), decreasing=TRUE))
+
+start_var <- within_rank %>%
+  mutate(start_sec = ifelse(within_rank == 1, 0, (lead(tsecs_elapsed) + 1)))
+
+## end var
+rev_within_rank <- start_var %>%
+  group_by(GAME_ID) %>%
+  mutate(rev_win = order(GAME_ID, EVENTNUM, decreasing=TRUE))
+
+end_var <- rev_within_rank %>%
+  mutate(end_sec = ifelse(rev_win == 1, 2880, tsecs_elapsed))
+
+## get rid of starts before ends
+pos_time <- end_var %>%
+  filter(end_sec >= start_sec)
+
+combo_time <- pos_time
+for (i in 1:length(named_pids)) {
+  test4 <- pfunner(combo_time, pname = names(named_pids[i]), pid = named_pids[[i]])
+  combo_time <- test4
+}
+```
+
+We'll now group the records by `GAME_ID` and arrange them in order by `start_sec`.
+
+```{r arranged time}
+combo_time <- combo_time %>%
+  group_by(GAME_ID) %>%
+  arrange(GAME_ID, start_sec)
+```
+
+We'll also create a data frame containing an observation for each second in a four-quarter NBA game (2,880 seconds, which have be a length of 2,881).
+
+```{r seconds df}
+seconds <- c(0:2880)
+df <- data.frame(seconds)
+```
+
+We'll be working with each second of each game, so we'll create a frame with `x` number of each second, one per game. Because names cannot start with a number, we'll create a new variable that prefaces the game id value with the letter g.
+
+```{r}
+## create variable to be row name (can't start w/ number)
+g_combo <- c(paste("g",combo_gid, sep = ""))
+named_combo <- combo_gid
+## use row-name variable to name combo gid vector
+names(named_combo) <- g_combo
+game_time <- enframe(named_combo, name = "g_combo", value = "combo_gid")
+```
+
+Since we want a record for each second of each game, we'll need to repeat the vector of seconds by the number of games played. In order to keep the game ids in a specified order, we'll create a list.
+
+```{r}
+## repeat seconds variable per number of games for new df
+repeated_secs <- rep(c(0:2880), each=length(combo_gid))
+repeated_sec2 <- data.frame(repeated_secs)
+combo_list <- as.list(combo_gid)
+## create game id per seconds (2881, or length of seconds vector)
+## note: repeating list retains order
+combo_gids <- rep(c(combo_list), times=length(seconds))
+combo_gids <- data_frame(combo_gids)
+## bind
+gid_secs <- bind_cols(repeated_sec2, combo_gids)
+```
+
+Now we'll prepare a our data frame so that we can join it with our records from the play-by-play data. Then we can join our play-by-play observations to the matching game id and starting second.
+
+```{r}
+## create df with key cols for joining
+gid_secs2 <- gid_secs %>%
+  rename(start_sec = repeated_secs) %>%
+  rename(GAME_ID = combo_gids) %>%
+  mutate(GAME_ID = as.character(GAME_ID))
+## left join (keep all for full length) by key cols
+gid_secs_pbp <- left_join(gid_secs2, combo_time, by = c("GAME_ID", "start_sec"))
+```
+
+Because we don't have an actual record for every single second of each game, the new data frame will have a lot of empty cells/`NA`s. To fill in those observations, we'll use the preceding given value. In order to do so accurately, we'll need to arrange the data frame by game and seconds.
+
+```{r}
+## important to sort by GAME_ID **
+gid_sorted_pbp <- gid_secs_pbp %>%
+  arrange(GAME_ID, start_sec) %>%
+  rename(second = start_sec)
+```
+
+Then we can fill in the player values for each second using the `fill()` function from `tidyr`.
+
+```{r}
+## filling previous column value
+## note: done by position, so double-check for different setup
+gid_sorted_pbp <- fill(gid_sorted_pbp, players:ErsanIlyasova)
+
+write.csv(gid_sorted_pbp, file = "data/okc/combo_gid_sorted_pbp.csv", row.names = FALSE)
+```
+
+## Creating a summary frame
+
+Because we want to know the frequency that each player was on the court for a given second, we can create a smaller data frame with just the seconds and spaceless player name (`pname`) variables.
+
+```{r}
+## create vector of desired columns
+select_cols <- c("second", pname_vec)
+## select those columns for new data frame
+player_seconds_df <- select(gid_sorted_pbp, one_of(c(select_cols)))
+```
+
+Now we'll summarize our data frame to get the total times that each player was on the court for each second.
+
+```{r}
+player_secs_sum <- player_seconds_df %>%
+  group_by(second) %>%
+  summarise_all(funs(sum))
+
+write.csv(player_secs_sum, file="data/okc/combo_player_secs_sum.csv", row.names = FALSE)
+```
+
+Now we have a data frame with the information we want, but it is not tidy. So, we'll use `gather()` to clean things up.
+
+```{r}
+## note: change depending on number of players
+gathered_player_secs <- gather(player_secs_sum, "player", "freq", 2:length(select_cols))
+```
+
+We'll also create a summary table with the total number of seconds played by each player, for the purposes of ordering the player variable later on, and add the calculated values to our existing data frames.
+```{r}
+## note: change depending on number of players
+total_player_secs <- player_secs_sum %>%
+  summarise_all(funs(sum)) %>%
+  rename(total = second) %>%
+  gather("player", "tot_secs", 1:length(select_cols)) %>%
+  filter(player != "total") %>%
+  arrange(desc(tot_secs))
+
+total_player_secs <- total_player_secs %>%
+  mutate(tot_rank = dense_rank(tot_secs))
+
+## add total player secs to gathered
+gathered_player_secs$player_tot_secs <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_secs
+pids_1617$player_tot_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_secs
+## and rank secs
+gathered_player_secs$player_tot_rank <- total_player_secs[match(gathered_player_secs$player, total_player_secs$player),]$tot_rank
+pids_1617$player_tot_rank <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$tot_rank
+```
+
+To get the players in their desired order for plotting, we'll create a new, _ordered_ vector of players, which we'll use as our `factor` levels.
+```{r}
+ordered_pname <- pids_1617 %>%
+  arrange(player_tot_secs)
+
+ordered_pnames <- ordered_pname$pname
+```
+
+Now we'll convert the `pname` variable into a factor, using the order built, above.
+
+```{r}
+library(forcats)
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = ordered_pnames)
+## check if factor
+class(gathered_player_secs$player)
+
+```
+
+```{r include=FALSE}
+write.csv(gathered_player_secs, file = "data/okc/combo_gathered_player_secs.csv", row.names = FALSE)
+```
+
+## Plotting the Data
+
+```{r plot no facets, fig.width=10}
+ggplot(gathered_player_secs,aes(x=second,y=player,fill=freq)) +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "gold") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white") +
+  geom_vline(xintercept = 1440, color = "white") +
+  geom_vline(xintercept = 2160, color = "white") +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(panel.grid.minor = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.title.y = element_blank())
+```
+
+If we wanted to build the plot using facets, instead of players along the y-axis, we'll want to reverse the order of the `player` factor levels.
+
+```{r}
+rev_ordered_pname <- pids_1617 %>%
+  arrange(desc(player_tot_secs))
+
+rev_ordered_pnames <- rev_ordered_pname$pname
+
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = rev_ordered_pnames)
+```
+
+```{r faceted plot, fig.width=10}
+## faceted option
+ggplot(gathered_player_secs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "deeppink") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+We could also restrict the players included in our plot by, say, total seconds played. For example, let's include only players whose total seconds exceed 6,000 (100 minutes).
+
+```{r filtered plot, fig.width=10}
+filtered_psecs <- gathered_player_secs %>%
+  filter(player_tot_secs > 6000)
+
+ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "turquoise") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+If we wanted to focus our visualization on starters vs. non-starters, we could re-sort our player factor by the number of times a player was on at the start of the game (i.e. when zero seconds had elapsed).
+
+```{r include=FALSE}
+player_first_secs <- player_secs_sum %>%
+  filter(second < 1) %>%
+  summarise_all(funs(sum)) %>%
+  rename(total = second) %>%
+  gather("player", "first_sec", 1:19) %>%
+  filter(player != "total") %>%
+  arrange(desc(first_sec))
+
+## join to total player secs frame
+total_player_secs <- left_join(total_player_secs, player_first_secs, by = "player")
+
+## join to pid_1617 using match bc no common var name
+pids_1617$player_first_secs <- total_player_secs[match(pids_1617$pname, total_player_secs$player),]$first_sec
+
+## arrange by first sec plus secondary for ties
+first_sec_ordered_pname <- pids_1617 %>%
+  arrange(desc(player_first_secs), desc(player_tot_secs))
+
+fs_ordered_pnames <- first_sec_ordered_pname$pname
+
+## use first second ordered names as levels for pname factor
+gathered_player_secs$player <- factor(gathered_player_secs$player, levels = fs_ordered_pnames)
+
+## filter for more than 100 mins
+filtered_psecs <- gathered_player_secs %>%
+  filter(player_tot_secs > 6000)
+```
+
+We'll filter for players with over 100 minutes, as we did in the previous chart.
+
+```{r fs ordered, fig.width=10}
+ggplot(filtered_psecs,aes(x=second,y=1,fill=freq)) +
+  facet_grid(player~., switch = "y") +
+  geom_tile(alpha = 0.9) +
+  scale_fill_gradient(low = "grey90", high = "mediumblue") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  geom_vline(xintercept = 720, color = "white", size = 0.2) +
+  geom_vline(xintercept = 1440, color = "white", size = 0.2) +
+  geom_vline(xintercept = 2160, color = "white", size = 0.2) +
+  ggtitle("Home and Away Games") +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.title.y = element_blank()) +
+  theme(strip.text.y = element_text(angle = 180)) +
+  theme(strip.background = element_blank()) +
+  theme(panel.spacing.y =unit(.02, "lines"))
+```
+
+----
+```{r sessionInfo}
+sessionInfo()
+```
+
